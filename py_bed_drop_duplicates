@@ -1,0 +1,75 @@
+def py_bed_drop_duplicates(list_bedfiles=[], all_columns=False):
+    """
+    written by peteskene@gmail.com
+    
+    takes in a list of bedfiles ['A.bed', 'B.bed']; can include path
+    and counts total number of reads and duplicated reads:
+        if all_columns=False, considers only first 3 columns <chr> <start> <end> 
+        if all_columns=True, uses all columns of bed file for testing duplicity
+        
+    generates a new bed file with duplicates removed (keeps first instance of duplicate).
+    Auto-generates filenames 'A_drop_dupl.bed', 'B_drop_dupl.bed'. New files are saved to the parent location
+        
+    returns a dataframe:
+        <bedfile name> <total reads> <duplicates> <% duplicates> <unique bedfile name> <non-duplicated reads>
+        
+    """
+    
+    #check format of list_sam_files
+    if type(list_bedfiles)!=list:
+        return 'Exiting... bed files have to be provided as a list'
+    for item in list_bedfiles:
+        if type(item)!=str:
+            return 'Exiting... each element of list_bedfiles has to be a string'
+
+    print
+    print 'files imported: '
+    print '\n'.join(list_bedfiles)
+    print
+
+
+    #create empty DF to be filled by loop
+    output_df = pd.DataFrame(columns=['bed file', 'total reads', 'duplicates', '% duplicates',
+                                      'unique bedfile', 'non-duplicated reads'])
+    
+    
+    for item in list_bedfiles:
+        print 'importing bed file: ' + item
+        temp_bed = BedTool(item).to_dataframe()
+        #print temp_bed.head()
+        #print
+        
+        #generate output bed filename
+        output_bed_name = item.replace('.bed', '_drop_dupl.bed')
+        
+        total_reads = len(temp_bed.index)
+        #print 'total reads: ' + str(total_reads)
+        
+        if all_columns==True:
+            count_duplicates = temp_bed.duplicated().sum()
+            temp_bed.drop_duplicates(inplace=True)
+        
+        if all_columns==False:
+            count_duplicates = temp_bed.duplicated(subset=['chrom', 'start', 'end']).sum()
+            temp_bed.drop_duplicates(subset=['chrom', 'start', 'end'], inplace=True)
+        
+        #print 'duplicates: ' +str(count_duplicates)
+        
+        percent_duplicates = (float(count_duplicates)/total_reads)*100
+        #print '% duplicates: ' + str(percent_duplicates)
+        
+        non_duplicates = len(temp_bed.index)
+        
+        #create a temp DF for the row of data
+        temp_df = pd.DataFrame([[item, total_reads, count_duplicates, percent_duplicates, output_bed_name, non_duplicates]],
+                    columns=['bed file', 'total reads', 'duplicates', '% duplicates', 'unique bedfile', 'non-duplicated reads'])
+        
+        output_df = output_df.append(temp_df, ignore_index=True)
+        
+        #save output bed
+        temp_bed.to_csv(output_bed_name, sep='\t', header=False, index=False)
+        
+        
+        
+        
+    return output_df
